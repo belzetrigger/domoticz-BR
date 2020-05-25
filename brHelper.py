@@ -194,9 +194,9 @@ class Br(object):
 
         customObjects = []
         summary = ""
-        summary = "{}{} {:%d.%m.%Y}{}".format(summary, BR_NAME, self.dates[0], seperator)
-        summary = "{}{} {:%d.%m.%Y}{}".format(summary, BR_NAME, self.dates[1], seperator)
-        summary = "{}{} {:%d.%m.%Y}{}".format(summary, BR_NAME, self.dates[2], seperator)
+        summary = "{}{} {:%d.%m.%Y %a}{}".format(summary, BR_NAME, self.dates[0], seperator)
+        summary = "{}{} {:%d.%m.%Y %a}{}".format(summary, BR_NAME, self.dates[1], seperator)
+        summary = "{}{} {:%d.%m.%Y %a}{}".format(summary, BR_NAME, self.dates[2], seperator)
         return summary
 
     def verify(self):
