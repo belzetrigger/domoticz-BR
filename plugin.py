@@ -27,7 +27,7 @@ externallink="https://github.com/belzetrigger/domoticz-BR" >
             <li>Alarm - showing the dates</li>
         </ul>
         <h3>Configuration</h3>
-        Configuration options...
+        Configuration options, details see github
     </description>
     <params>
         <param field="Mode1" label="username" width="200px"
@@ -36,8 +36,8 @@ externallink="https://github.com/belzetrigger/domoticz-BR" >
         password="true"
         required="true" />
 
-        <param field="Mode4" label="Update every x minutes" width="200px"
-        required="true" default="5"/>
+        <param field="Mode4" label="Update every x hours" width="200px"
+        required="true" default="3"/>
 
         <param field="Mode6" label="Debug" width="75px">
             <options>
@@ -61,8 +61,8 @@ from brHelper import Br
 
 # config
 PARAM_PASS = "Mode2"        # idx for password
-MIN_POLL_TIME = 5           # in minutes
-MAX_POLL_TIME = 12 * 60     # in minutes = 12h
+MIN_POLL_TIME = 1           # in hours
+MAX_POLL_TIME = 24          # in hours
 # icons
 
 # units
@@ -102,15 +102,15 @@ class BasePlugin:
             temp = 60
 
         if temp < MIN_POLL_TIME:
-            temp = MIN_POLL_TIME  # minimum polling interval
+            temp = MIN_POLL_TIME            # minimum polling interval
             Domoticz.Error(
                 "Specified polling interval too short: changed to {}} minutes".format(MIN_POLL_TIME))
         elif temp > (MAX_POLL_TIME):
-            temp = (MAX_POLL_TIME)  # maximum polling interval is 1 hour
+            temp = (MAX_POLL_TIME)          # maximum polling interval is 1 hour
             Domoticz.Error(
                 "Specified polling interval too long: changed to {} hour".format(MAX_POLL_TIME))
 
-        self.pollinterval = temp * 60
+        self.pollinterval = temp * 60 * 60  # its hour based
         Domoticz.Log("Using polling interval of {} seconds".format(
             str(self.pollinterval)))
         # recipient
@@ -182,7 +182,7 @@ class BasePlugin:
 
             if hasError:
                 if self.errorCounter > 5:
-                    self.nextpoll = myNow + timedelta(minutes == 5)
+                    self.nextpoll = myNow + timedelta(minutes=5)
                     self.brHelper.stop()
                     Domoticz.Error("To much error happend, reset and wait 5min ")
                 else:
