@@ -22,8 +22,9 @@ try:
 except Exception as e:
     Domoticz.Error("Error import requests".format(e))
 
-BR_DATE_FORMAT = "%Y-%m-%d"
-BR_NAME = "Papier"
+BR_DATE_FORMAT = "%Y-%m-%d"  # date format we use
+BR_NAME = "Papier"          # standard name
+BR_HOUR_THRESHOLD = 14      # o'clock when it is time to show next date
 
 
 class Br(object):
@@ -45,12 +46,13 @@ class Br(object):
         self.nearestDate: datetime.date = None
         self.resetError()
         self.lastRead: datetime = None
+        self.lastDeviceName: str = None
 
     def setError(self, error):
         '''sets the error msg and put error flag to True
 
         Arguments:
-            error {Exception} -- the catched exception
+            error {Exception} -- the caught exception
         '''
         self.hasError = True
         self.errorMsg = error
@@ -200,11 +202,21 @@ class Br(object):
         return summary
 
     def verify(self):
+        """should be called after reading  values from web.
+        analyze the dates and calculates the name. 
+        and marks element as needs update=True if there are changes 
+        """
         if self.dates:
             d: datetime = self.dates[0]
+            # threshold to skip to next date
+            if (d == datetime.now().date() and datetime.now().hour > BR_HOUR_THRESHOLD):
+                Domoticz.Log("Nearest Date is today and now it is too late.... So switch to next date")
+                d: datetime = self.dates[1]
+
             if not self.nearestDate:
                 Domoticz.Log("No old nearest Date so set it to:{} - maybe init?".format(d))
                 self.nearestDate = d
+                self.lastDeviceName = self.calculateName()
                 self.needsUpdate = True
             else:
                 Domoticz.Debug("Compare dates")
@@ -213,14 +225,19 @@ class Br(object):
                     self.nearestDate = d
                     self.needsUpdate = True
                 elif d == self.nearestDate:
-                    Domoticz.Debug("Do nothing same date")
+                    Domoticz.Debug("same date - check name")
                     self.needsUpdate = False
+                    s = self.calculateName()
+                    if(self.lastDeviceName != s):
+                        self.lastDeviceName = s
+                        self.needsUpdate = True
+
                 else:
-                    Domoticz.Error("Should not happen - reinit?")
+                    Domoticz.Error("Should not happen - re-init?")
 
     def getDates(self, txt: str):
-        """extractes from html response the '\"Task Date\":\"2020-07-15\",' 
-        and convertes it to date array
+        """extracts from html response the '\"Task Date\":\"2020-07-15\",'
+        and converts it to date array
 
         Arguments:
             txt {str} -- response.txt
@@ -241,11 +258,19 @@ class Br(object):
         return dates
 
     def getName(self):
-        '''calculates a name based on nearest waste element
-        form: [image optional] (waste type) (days till collection)
+        """just return last calculated device name. More see calculateName
 
         Returns:
-            {str} -- name as string
+            str: the last name
+        """
+        return self.lastDeviceName
+
+    def calculateName(self):
+        '''calculates a name based on nearest waste element
+         form: [image optional] (waste type) (days till collection)
+
+         Returns:
+             {str} -- name as string
         '''
 
         s = "No Data"
@@ -257,7 +282,7 @@ class Br(object):
             # img = ''
             # if (SHOW_ICON_IN_NAME is True):
             #     img = "{}".format(self.nearest.getImageTag('22', '0', 'top'))
-            #s = "{} {} {}".format(img, t, lvl[1])
+            # s = "{} {} {}".format(img, t, lvl[1])
             s = "Papier{}".format(lvl[1])
 
         if(self.hasError is True):
@@ -321,7 +346,7 @@ def findDivByClass(soup: BeautifulSoup, name: str):
 
     Arguments:
         soup {BeautifulSoup} -- the soup
-        name {str} -- classname attribute of the seached div element
+        name {str} -- classname attribute of the searched div element
 
     Returns:
         [soup element] -- the found element
@@ -351,6 +376,14 @@ def getInputValue(soup: BeautifulSoup, id: str):
 
 
 def getValue(inpt):
+    """reads in an input field and extracts the value of it
+
+    Args:
+        inpt ([type]): html input field
+
+    Returns:
+        str: value of that field
+    """
     r: str = None
     if inpt:
         r = inpt.get('value')
