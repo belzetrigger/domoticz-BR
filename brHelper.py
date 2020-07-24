@@ -24,7 +24,7 @@ except Exception as e:
 
 BR_DATE_FORMAT = "%Y-%m-%d"  # date format we use
 BR_NAME = "Papier"          # standard name
-BR_HOUR_THRESHOLD = 14      # o'clock when it is time to show next date
+BR_HOUR_THRESHOLD = 12      # o'clock when it is time to show next date
 
 
 class Br(object):
@@ -135,10 +135,10 @@ class Br(object):
             r3 = s.post(url, headers=headers, data=login_data)
             # should be redirect 302  to Default and there a 200 code
             if(r3.status_code == 200):
-                Domoticz.Debug('logged in Login')
+                Domoticz.Debug('logged in')
                 # https://kundenportal.berlin-recycling.de/(S(wkjgyi0a4lkmtrg3nimurb5k))/Default.aspx/ChangeDatasetTable
                 brDefaultUrl = r3.url
-
+                # Domoticz.Debug('default url#3 {}'.format(brDefaultUrl))
                 headers2 = {
                     'Connection': 'keep-alive',
                     'Accept': 'application/json, text/javascript, */*; q=0.01',
@@ -160,6 +160,7 @@ class Br(object):
                 # Domoticz.Debug("soup:{}".format(soup.prettify()))
 
                 url4 = brDefaultUrl + "/ChangeDatasetTable"
+                # Domoticz.Debug('default url#4 {}'.format(url4))
                 change_data = {'datasettable': 'ENWIS_ABFUHRKALENDER'}
                 r4 = s.post(url4, headers=headers2, json=change_data)
                 # soup = BeautifulSoup(r4.content)
@@ -168,6 +169,7 @@ class Br(object):
                 # # works
                 # # GetDatasetTableHead
                 url5 = brDefaultUrl + "/GetDatasetTableHead"
+                # Domoticz.Debug('default url#5 {}'.format(url5))
                 change_data = {
                     "datasettablecode": "ENWIS_ABFUHRKALENDER",
                     "startindex": 0,
@@ -178,6 +180,7 @@ class Br(object):
                     "ClientParameters": "",
                     "headrecid": ""}
                 r5 = s.post(url5, headers=headers2, json=change_data)
+                # Domoticz.Debug('response {}'.format(r5))
                 self.dates = self.getDates(r5.text)
                 self.verify()
                 self.lastRead = datetime.now()
@@ -245,16 +248,22 @@ class Br(object):
         Returns:
             [date] -- [array of dates]
         """
+        # Domoticz.Debug('getDates {}'.format(txt))
         jData = json.loads(txt)
         jData2 = json.loads(jData['d'])  # just load again, as before it might be incomplete json
         ar = jData2['data']
+        # Domoticz.Debug('data array: {}'.format(ar))
         dates = []
+
         for e in ar:
-            sDate = e['Task Date']
-            if sDate:
-                d = datetime.strptime(sDate, BR_DATE_FORMAT)
+            if(e):
+                sDate = e['Task Date']
+                # Domoticz.Debug('date: {}'.format(sDate))
+                d = toDate(sDate, BR_DATE_FORMAT)
+                # Domoticz.Debug('date: {}'.format(d))
                 dates.append(d.date())
 
+        Domoticz.Debug('parsed data {}'.format(dates))
         return dates
 
     def getName(self):
@@ -388,3 +397,12 @@ def getValue(inpt):
     if inpt:
         r = inpt.get('value')
     return r
+
+
+def toDate(sDate: str, sformat: str = "%Y-%m-%d"):
+    try:
+        res = datetime.strptime(sDate, sformat)
+    except TypeError:
+        res = datetime(*(myTime.strptime(sDate, sformat)[0:6]))
+    # Domoticz.Debug("date: ".format(res))  # testcompete print alternation
+    return res
