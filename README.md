@@ -7,9 +7,9 @@
 [![Plugin version](https://img.shields.io/badge/version-0.0.2-red.svg)](https://github.com/belzetrigger/domoticz-BR/branches/)
 
 A simple alarm device that shows next collection dates from (Berlin Recycling)[https://www.berlin-recycling.de/] and turns alarm level according to this date.
-| Device       | Image          | Comment                            |
-| ------------ | -------------- | ---------------------------------- |
-| Alarm Device | todo add image | show next date of waste collection |
+| Device       | Image                                                                                                         | Comment                            |
+| ------------ | ------------------------------------------------------------------------------------------------------------- | ---------------------------------- |
+| Alarm Device | ![BR Device](https://raw.githubusercontent.com/belzetrigger/domoticz-BR/master/resources/BR_Alarm_Device.png) | show next date of waste collection |
 
 This plugin is open source.
 
