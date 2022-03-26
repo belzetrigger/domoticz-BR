@@ -6,6 +6,10 @@ from time import mktime
 import time as myTime
 # import urllib
 from urllib.parse import quote, quote_plus
+# workaround ssl issues
+import ssl
+import certifi
+import pathlib
 
 try:
     import Domoticz
@@ -72,10 +76,36 @@ class Br(object):
     def stop(self):
         self.reset()
 
+    def testCert(self):
+        try:
+            # Domoticz.Debug('current working directory: {}'.format(pathlib.Path().resolve()))
+            # Domoticz.Debug('directory of the script being run: {}'.format(pathlib.Path(__file__).parent.resolve()))
+
+            Domoticz.Debug('Checking connection to BR...' + self.BR_URL)
+            test = requests.get(self.BR_URL)
+            Domoticz.Debug('Connection to BR OK.')
+        except requests.exceptions.SSLError as err:
+            Domoticz.Error('SSL Error. Adding intermediate certs to Certifi store...')
+            cafile = certifi.where()
+            customCertPath = ("{}/sfig2.crt.pem".format(pathlib.Path(__file__).parent.resolve()))
+            with open(customCertPath, 'rb') as infile:
+                customca = infile.read()
+            with open(cafile, 'ab') as outfile:
+                outfile.write(customca)
+            print('That might have worked.')
+
     def read(self):
         try:
+            self.testCert()
             Domoticz.Debug('Retrieve waste collection data from ' + self.BR_URL)
-            r = requests.get(self.BR_URL)
+            # workaround certs
+            # certifi.where()
+            Domoticz.Debug('Using root ca:' + certifi.where())
+            REQUESTS_CA_BUNDLE = certifi.where()
+            SSL_CERT_FILE = certifi.where()
+
+            # conn = urllib3.connection_from_url(self.BR_URL, ca_certs=certifi.where())
+            r = requests.get(self.BR_URL, verify=certifi.where())
             if r.status_code != 200:
                 raise BaseException("connection problem")
             redirectUlr = r.url

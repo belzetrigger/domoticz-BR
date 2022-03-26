@@ -8,7 +8,7 @@ BerlinRecycling Paper Collection Date Reader Plugin
 Author: Belze(2020)
 
 
-Version:    0.0.1: Initial Version
+Version:    0.0.2: Initial Version
 """
 
 """
