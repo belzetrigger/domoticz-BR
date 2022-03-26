@@ -159,8 +159,8 @@ class Br(object):
                 '__VIEWSTATE': viewStateValue,
                 '__VIEWSTATEGENERATOR': viewStateGenValue,
                 '__EVENTVALIDATION': eventValidValue,
-                'Username': '***REMOVED***',
-                'Password': '***REMOVED***'
+                'Username': self.password,
+                'Password': self.username
             }
             r3 = s.post(url, headers=headers, data=login_data)
             # should be redirect 302  to Default and there a 200 code
