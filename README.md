@@ -4,7 +4,7 @@
 -->
 
 [![PyPI pyversions](https://img.shields.io/badge/python-3.6%20|%203.7%20|%203.8-blue.svg)]() 
-[![Plugin version](https://img.shields.io/badge/version-0.0.1-red.svg)](https://github.com/belzetrigger/domoticz-BR/branches/)
+[![Plugin version](https://img.shields.io/badge/version-0.0.2-red.svg)](https://github.com/belzetrigger/domoticz-BR/branches/)
 
 A simple alarm device that shows next collection dates from (Berlin Recycling)[https://www.berlin-recycling.de/] and turns alarm level according to this date.
 | Device       | Image          | Comment                            |
@@ -44,11 +44,12 @@ This plugin is open source.
 
 
 ## Versions
-| Version | Note                          |
-| ------- | ----------------------------- |
-| 0.0.1   | First version of this plugin. |
+| Version | Note                                       |
+| ------- | ------------------------------------------ |
+| 0.0.2   | Inject intermediate certificate for https. |
+| 0.0.1   | First version of this plugin.              |
 
-## State
+
 Under development
 
 
