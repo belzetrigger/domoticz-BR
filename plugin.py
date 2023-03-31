@@ -5,14 +5,14 @@
 """
 BerlinRecycling Paper Collection Date Reader Plugin
 
-Author: Belze(2020)
-
+Author: Belze(2023)
 
 Version:    0.0.2: Initial Version
+Version:    0.1.2: new login mode and test cases
 """
 
 """
-<plugin key="BerlinRecycling" name="Berlin Recycling" author="belze" version="0.0.1"
+<plugin key="BerlinRecycling" name="Berlin Recycling" author="belze" version="0.1.2"
 externallink="https://github.com/belzetrigger/domoticz-BR" >
     <description>
         <h2>Berlin Recycling - Paper collection</h2><br/>
@@ -55,9 +55,11 @@ from datetime import datetime, timedelta
 try:
     import Domoticz
 except ImportError:
-    import fakeDomoticz as Domoticz
+    from blz import fakeDomoticz as Domoticz
+    from blz.fakeDomoticz import Parameters
+    from blz.fakeDomoticz import Devices
 
-from brHelper import Br
+from br.brHelper import Br
 
 # config
 PARAM_PASS = "Mode2"        # idx for password
@@ -79,9 +81,10 @@ class BasePlugin:
         self.nextpoll = datetime.now()
         self.pollinterval = 60 * 60  # once a hour
         self.errorCounter = 0
-        self.br: brHelper.Br = None
+        self.br: Br = None
         self.user: str = None
         self.pw: str = None
+        self.lastUpdate: datetime = None
         return
 
     def onStart(self):
@@ -104,7 +107,7 @@ class BasePlugin:
         if temp < MIN_POLL_TIME:
             temp = MIN_POLL_TIME            # minimum polling interval
             Domoticz.Error(
-                "Specified polling interval too short: changed to {}} minutes".format(MIN_POLL_TIME))
+                "Specified polling interval too short: changed to {} minutes".format(MIN_POLL_TIME))
         elif temp > (MAX_POLL_TIME):
             temp = (MAX_POLL_TIME)          # maximum polling interval is 1 hour
             Domoticz.Error(
@@ -127,12 +130,12 @@ class BasePlugin:
 
         try:
 
-            self.brHelper = Br(username=self.user,
-                               password=self.pw,
-                               debug=self.debug)
+            self.br = Br(username=self.user,
+                         password=self.pw,
+                         debug=self.debug)
 
-            if(self.debug):
-                self.brHelper.dumpConfig()
+            if (self.debug):
+                self.br.dumpConfig()
 
             # do first read here or later?
             # self.brHelper.read()
@@ -143,8 +146,8 @@ class BasePlugin:
             Devices[UNIT_ALARM_IDX].Update(0, "Off", Name=UNIT_ALARM_NAMEs + " << ERROR ")
 
     def onStop(self):
-        if self.brHelper:
-            self.brHelper.stop()
+        if self.br:
+            self.br.stop()
         Devices[UNIT_ALARM_IDX].Update(0, "Off", Name=UNIT_ALARM_NAME)
         Domoticz.Log("onStop called")
 
@@ -157,7 +160,7 @@ class BasePlugin:
         Command = Command.strip()
         action, sep, params = Command.partition(' ')
         action = action.capitalize()
-        #params = params.capitalize()
+        # params = params.capitalize()
 
     def onNotification(self, Name, Subject, Text, Status, Priority, Sound, ImageFile):
         Domoticz.Log("BLZ Notification: " + Name + "," + Subject + "," + Text + ","
@@ -174,16 +177,16 @@ class BasePlugin:
                 "----------------------------------------------------")
             hasError = False
             self.nextpoll = myNow + timedelta(seconds=self.pollinterval)
-            self.brHelper.read()
+            self.br.read()
             # we might still have an internal error
-            if (hasError is False and self.brHelper.hasError is True):
+            if (hasError is False and self.br.hasError is True):
                 hasError = True
                 Domoticz.Error("internal error discovered ..")
 
             if hasError:
                 if self.errorCounter > 5:
                     self.nextpoll = myNow + timedelta(minutes=5)
-                    self.brHelper.stop()
+                    self.br.stop()
                     Domoticz.Error("To much error happend, reset and wait 5min ")
                 else:
                     self.errorCounter += 1
@@ -194,10 +197,10 @@ class BasePlugin:
 
             else:
                 self.errorCounter = 0
-                if self.brHelper.needsUpdate is True:
-                    alarmLevel = self.brHelper.getAlarmLevel()
-                    summary = self.brHelper.getSummary()
-                    name = self.brHelper.getName()
+                if self.br.needsUpdate is True:
+                    alarmLevel = self.br.getAlarmLevel()
+                    summary = self.br.getSummary()
+                    name = self.br.getName()
                     # TODO as we change name but updateDevice is not checking this, we say alwaysUpdate
                     updateDevice(1, alarmLevel, summary, name, True)
                     self.lastUpdate = myNow
@@ -263,16 +266,16 @@ def DumpConfigToLog():
     for x in Parameters:
         if Parameters[x] != "":
             value: str = str(Parameters[x])
-            if(x == PARAM_PASS):
+            if (x == PARAM_PASS):
                 value = 'xxx'
             Domoticz.Debug("{}:\t{}".format(x, value))
     Domoticz.Debug("Device count: " + str(len(Devices)))
     for x in Devices:
         Domoticz.Debug("Device:           " + str(x) + " - " + str(Devices[x]))
         Domoticz.Debug("Device ID:       '" + str(Devices[x].ID) + "'")
-        Domoticz.Debug("Device Name:     '" + Devices[x].Name + "'")
+        Domoticz.Debug("Device Name:     '" + str(Devices[x].Name) + "'")
         Domoticz.Debug("Device nValue:    " + str(Devices[x].nValue))
-        Domoticz.Debug("Device sValue:   '" + Devices[x].sValue + "'")
+        Domoticz.Debug("Device sValue:   '" + str(Devices[x].sValue) + "'")
         Domoticz.Debug("Device LastLevel: " + str(Devices[x].LastLevel))
     return
 
@@ -303,7 +306,7 @@ def updateDevice(Unit, alarmLevel, alarmData, name='', alwaysUpdate=False):
     # Make sure that the Domoticz device still exists (they can be deleted) before updating it
     if Unit in Devices:
         if (alarmData != Devices[Unit].sValue) or (int(alarmLevel) != Devices[Unit].nValue or alwaysUpdate is True):
-            if(len(name) <= 0):
+            if (len(name) <= 0):
                 Devices[Unit].Update(int(alarmLevel), alarmData)
             else:
                 Devices[Unit].Update(int(alarmLevel), alarmData, Name=name)

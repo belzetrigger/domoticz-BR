@@ -128,3 +128,6 @@ foo.py
 bash.exe.stackdump
 check_device_online.py
 *.db
+test/my_config.ini
+test/t5_prv.py
+test/*_prv.py

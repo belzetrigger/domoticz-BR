@@ -14,27 +14,24 @@ import pathlib
 try:
     import Domoticz
 except ImportError:
-    import fakeDomoticz as Domoticz
+    from blz import fakeDomoticz as Domoticz
 
-try:
-    from bs4 import BeautifulSoup
-except Exception as e:
-    Domoticz.Error("Error import BeautifulSoup".format(e))
+from blz.blzHelperInterface import BlzHelperInterface
 
-try:
-    import requests
-except Exception as e:
-    Domoticz.Error("Error import requests".format(e))
+import requests
 
 BR_DATE_FORMAT = "%Y-%m-%d"  # date format we use
 BR_NAME = "Papier"          # standard name
 BR_HOUR_THRESHOLD = 12      # o'clock when it is time to show next date
 
 
-class Br(object):
+class Br(BlzHelperInterface):
     """simple helper class for parsing content from berlin recycling"""
 
     BR_URL = "https://kundenportal.berlin-recycling.de/"
+    BR_URL_DEFAULT = BR_URL + "Default.aspx"
+    BR_URL_DEF_CHANGE = BR_URL_DEFAULT + "/ChangeDatasetTable"
+    BR_URL_DEF_GET = BR_URL_DEFAULT + "/GetDatasetTableHead"
 
     def __init__(self, username: str, password: str, debug: bool = False):
         super(Br, self).__init__()
@@ -46,11 +43,25 @@ class Br(object):
 
     def reset(self):
         self.needsUpdate = False
-        self.dates = []
+        self.dates = [None] * 2
         self.nearestDate: datetime.date = None
         self.resetError()
         self.lastRead: datetime = None
         self.lastDeviceName: str = None
+
+    def reinitData(self):
+        Domoticz.Debug("no internal data class, so no reinit needed")
+
+    def checkError(self, jsn):
+        '''checks if response contains error        
+        '''
+        if 'd' not in jsn:
+            raise BaseException("cannot read response" + d)
+        d = json.loads(jsn['d'])
+        if 'Error' not in d:
+            raise BaseException("Unknown feedback - must contain Error attribute")
+        elif (d['Error'] is True):
+            raise BaseException("Error - Details: " + d['Message'])
 
     def setError(self, error):
         '''sets the error msg and put error flag to True
@@ -66,6 +77,15 @@ class Br(object):
         '''
         self.hasError = False
         self.errorMsg = None
+
+    def hasErrorX(self):
+        return self.hasError
+
+    def getErrorMsg(self):
+        """
+        if there is an error message, this will be delivered
+        """
+        return self.errorMsg
 
     def dumpConfig(self):
         Domoticz.Debug(
@@ -116,25 +136,6 @@ class Br(object):
 
             # data = r2.json()
             Domoticz.Debug('BR: #1 working on Login:\t')
-            viewStateValue = None
-            eventTargetValue = None
-            eventTargetArgValue = None
-            viewStateGenValue = None
-            eventValidValue = None
-            soup: BeautifulSoup = BeautifulSoup(r2.content, "html.parser")
-            # soup = BeautifulSoup(r2.content)
-            viewStateValue = getInputValue(soup, '__VIEWSTATE')
-            # viewStateValue = soup.find('input', {'id': '__VIEWSTATE'}).get('value')
-            eventTargetValue = getInputValue(soup, '__EVENTTARGET')
-            # eventTargetValue = soup.find('input', {'id': '__EVENTTARGET'}).get('value')
-            eventTargetArgValue = getInputValue(soup, '__EVENTARGUMENT')
-            # eventTargetArgValue = soup.find('input', {'id': '__EVENTARGUMENT'}).get('value')
-
-            # next block
-            viewStateGenValue = getInputValue(soup, '__VIEWSTATEGENERATOR')
-            # viewStateGenValue = soup.find('input', {'id': '__VIEWSTATEGENERATOR'}).get('value')
-            eventValidValue = getInputValue(soup, '__EVENTVALIDATION')
-            # eventValidValue = soup.find('input', {'id': '__EVENTVALIDATION'}).get('value')
 
             url = redirectUlr
             headers = {
@@ -142,9 +143,11 @@ class Br(object):
                 'Cache-Control': 'max-age=0',
                 'Upgrade-Insecure-Requests': '1',
                 'Origin': 'https://kundenportal.berlin-recycling.de',
-                'Content-Type': 'application/x-www-form-urlencoded',
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/81.0.4044.138 Safari/537.36',
-                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9',
+                'Content-Type': 'application/json; charset=UTF-8',
+                'User-Agent': ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                               "AppleWebKit/537.36 (KHTML, like Gecko) "
+                               "Chrome/81.0.4044.138 Safari/537.36"),
+                'Accept': '*/*',
                 'Sec-Fetch-Site': 'same-origin',
                 'Sec-Fetch-Mode': 'navigate',
                 'Sec-Fetch-User': '?1',
@@ -154,20 +157,21 @@ class Br(object):
             }
 
             login_data = {
-                '__EVENTTARGET': 'btnLog',
-                '__EVENTARGUMENT': eventTargetArgValue,
-                '__VIEWSTATE': viewStateValue,
-                '__VIEWSTATEGENERATOR': viewStateGenValue,
-                '__EVENTVALIDATION': eventValidValue,
-                'Username': self.username,
-                'Password': self.password
+                'username': self.username,
+                'password': self.password,
+                'rememberMe': False,
+                'encrypted': False
             }
-            r3 = s.post(url, headers=headers, data=login_data)
-            # should be redirect 302  to Default and there a 200 code
-            if(r3.status_code == 200):
+            u = "https://kundenportal.berlin-recycling.de/Login.aspx/Auth"
+            r3 = s.post(u, headers=headers, json=login_data)
+            self.checkError(r3.json())
+            # touch default page to see if works
+            r3 = s.get(Br.BR_URL_DEFAULT)
+
+            if (r3.status_code == 200):
                 Domoticz.Debug('logged in')
                 # https://kundenportal.berlin-recycling.de/(S(wkjgyi0a4lkmtrg3nimurb5k))/Default.aspx/ChangeDatasetTable
-                brDefaultUrl = r3.url
+                # brDefaultUrl = r3.url
                 # Domoticz.Debug('default url#3 {}'.format(brDefaultUrl))
                 headers2 = {
                     'Connection': 'keep-alive',
@@ -179,29 +183,45 @@ class Br(object):
                     'Sec-Fetch-Site': 'same-origin',
                     'Sec-Fetch-Mode': 'cors',
                     'Sec-Fetch-Dest': 'empty',
-                    'Referer': brDefaultUrl,
+                    'Referer': Br.BR_URL_DEFAULT,
                     'Accept-Language': 'de-DE,de;q=0.9,en-US;q=0.8,en;q=0.7',
                     # 'Cookie': ' cookieconsent_status=dismiss; _fbp=fb.1.1589755946090.857065657; _ga=GA1.2.657906153.1589755946; _gid=GA1.2.1757598692.1589755946',
                 }
-                url3b = brDefaultUrl + "/GetDashboard"
-                change_data = {'withhtml': 'true'}
-                r3b = s.post(url3b, headers=headers2, json=change_data)
+                # url3b = brDefaultUrl + "/GetDashboard"
+                # change_data = None
+                # r3b = s.post(url3b, headers=headers2, json=change_data)
                 # soup = BeautifulSoup(r3b.content)
                 # Domoticz.Debug("soup:{}".format(soup.prettify()))
 
-                url4 = brDefaultUrl + "/ChangeDatasetTable"
+                r3b = s.post(Br.BR_URL_DEFAULT + "/GetDashboard", headers=headers2)
+                self.checkError(r3b.json())
+                # https://kundenportal.berlin-recycling.de/Default.aspx/GetNavigationObject
+                r3b = s.post(Br.BR_URL_DEFAULT + "/GetNavigationObject",
+                             headers=headers2,
+                             json={
+                                 "updateUser": False})
+                self.checkError(r3b.json())
+                url3c = Br.BR_URL_DEFAULT + "/GetDataWithinFilter"
+                cd3 = {"datasetTableCode": "ABFUHRKALENDER",
+                       "minVal": "2023-02-27", "maxVal": "2023-04-10", "fieldNo": "10"}
+                r3c = s.post(url3c, headers=headers2, json=cd3)
+                self.checkError(r3c.json())
+
+                url4 = Br.BR_URL_DEF_CHANGE
+
                 # Domoticz.Debug('default url#4 {}'.format(url4))
-                change_data = {'datasettable': 'ENWIS_ABFUHRKALENDER'}
+                change_data = {'datasettable': 'ABFUHRKALENDER'}
                 r4 = s.post(url4, headers=headers2, json=change_data)
+                self.checkError(r4.json())
                 # soup = BeautifulSoup(r4.content)
                 # Domoticz.Debug("soup:{}".format(soup.prettify()))
 
                 # # works
                 # # GetDatasetTableHead
-                url5 = brDefaultUrl + "/GetDatasetTableHead"
+                url5 = Br.BR_URL_DEF_GET
                 # Domoticz.Debug('default url#5 {}'.format(url5))
                 change_data = {
-                    "datasettablecode": "ENWIS_ABFUHRKALENDER",
+                    "datasettablecode": "ABFUHRKALENDER",
                     "startindex": 0,
                     "searchtext": "",
                     "rangefilter": "",
@@ -210,34 +230,41 @@ class Br(object):
                     "ClientParameters": "",
                     "headrecid": ""}
                 r5 = s.post(url5, headers=headers2, json=change_data)
+                self.checkError(r5.json())
                 # Domoticz.Debug('response {}'.format(r5))
                 self.dates = self.getDates(r5.text)
                 self.verify()
                 self.lastRead = datetime.now()
-        except Exception as e:
+        except BaseException as e:
             Domoticz.Error("Error reading BR: {} ".format(e))
             self.setError(e)
 
     def dumpStatus(self):
-        Domoticz.Log("Status BR:"
-                     "read:\t{}\t"
-                     "needsUpdate:\t{}\t"
-                     "nearestDate:\t{:%d.%m.%Y}\t"
-                     .format(self.lastRead, self.needsUpdate, self.nearestDate))
+        s = "On Init"
+        if (self.lastRead is not None and self.nearestDate is not None):
+            s = ("Status BR: "
+                 "read:\t{}\t"
+                 "needsUpdate:\t{}\t"
+                 "nearestDate:\t{:%d.%m.%Y}\t"
+                 .format(self.lastRead, self.needsUpdate, self.nearestDate))
+
+        Domoticz.Log(s)
 
     def getSummary(self, seperator: str = '<br>'):
 
-        customObjects = []
         summary = ""
-        summary = "{}{} {:%d.%m.%Y %a}{}".format(summary, BR_NAME, self.dates[0], seperator)
-        summary = "{}{} {:%d.%m.%Y %a}{}".format(summary, BR_NAME, self.dates[1], seperator)
-        summary = "{}{} {:%d.%m.%Y %a}{}".format(summary, BR_NAME, self.dates[2], seperator)
+        if (self.dates.__len__ == 0):
+            summary = "NO DATA FOUND!"
+        elif (self.dates[0] is not None):
+            summary = "{}{} {:%d.%m.%Y %a}{}".format(summary, BR_NAME, self.dates[0], seperator)
+            summary = "{}{} {:%d.%m.%Y %a}{}".format(summary, BR_NAME, self.dates[1], seperator)
+           # summary = "{}{} {:%d.%m.%Y %a}{}".format(summary, BR_NAME, self.dates[2], seperator)
         return summary
 
     def verify(self):
         """should be called after reading  values from web.
-        analyze the dates and calculates the name. 
-        and marks element as needs update=True if there are changes 
+        analyze the dates and calculates the name.
+        and marks element as needs update=True if there are changes
         """
         if self.dates:
             d: datetime = self.dates[0]
@@ -261,7 +288,7 @@ class Br(object):
                     Domoticz.Debug("same date - check name")
                     self.needsUpdate = False
                     s = self.calculateName()
-                    if(self.lastDeviceName != s):
+                    if (self.lastDeviceName != s):
                         self.lastDeviceName = s
                         self.needsUpdate = True
 
@@ -280,13 +307,17 @@ class Br(object):
         """
         # Domoticz.Debug('getDates {}'.format(txt))
         jData = json.loads(txt)
-        jData2 = json.loads(jData['d'])  # just load again, as before it might be incomplete json
-        ar = jData2['data']
+        jData2 = json.loads(jData['d'])  # just get data inside
+        objects = (jData2['Object'])  # just extract objects
+
+        if 'data' not in objects:
+            Domoticz.Error("UNKNOWN Structure of response json")
+        ar = objects['data']
         # Domoticz.Debug('data array: {}'.format(ar))
         dates = []
 
         for e in ar:
-            if(e):
+            if (e):
                 sDate = e['Task Date']
                 # Domoticz.Debug('date: {}'.format(sDate))
                 d = toDate(sDate, BR_DATE_FORMAT)
@@ -296,6 +327,12 @@ class Br(object):
         Domoticz.Debug('parsed data {}'.format(dates))
         return dates
 
+    def getNearestDate(self):
+        d = None
+        if self.nearestDate is not None:
+            d = self.nearestDate
+        return d
+
     def getName(self):
         """just return last calculated device name. More see calculateName
 
@@ -303,6 +340,34 @@ class Br(object):
             str: the last name
         """
         return self.lastDeviceName
+
+    def needsUpdateX(self):
+        return self.needsUpdate
+
+    def getDeviceName(self):
+        """calculates a name based on nearest waste element
+
+
+        Returns:
+            {str} -- name as string
+        """
+        return self.calculateName()
+
+    def getAlarmText(self):
+        """only returns latest element like: (date) [optional hint]
+        if you want more, look at getSummary()
+
+        Returns:
+            {str} -- data from nearest text
+        """
+
+        s = "No Data"
+        if self.hasError is False and self.nearestDate is not None:
+            hint = None  # future i
+            s = "{}{}".format(self.nearestDate, hint if hint is not None else "")
+        if self.hasError is True:
+            s = "Error to get data"
+        return s
 
     def calculateName(self):
         '''calculates a name based on nearest waste element
@@ -313,7 +378,7 @@ class Br(object):
         '''
 
         s = "No Data"
-        if(self.nearestDate):
+        if (self.nearestDate):
             dt = self.nearestDate
             lvl = calculateAlarmLevel(dt)
             days = lvl[1]
@@ -324,7 +389,7 @@ class Br(object):
             # s = "{} {} {}".format(img, t, lvl[1])
             s = "Papier{}".format(lvl[1])
 
-        if(self.hasError is True):
+        if (self.hasError is True):
             s = "!Error!"
         return s
 
@@ -336,7 +401,7 @@ class Br(object):
         '''
 
         alarm = 0
-        if(self.hasError is False):
+        if (self.hasError is False):
             dt = self.nearestDate
             lvl = calculateAlarmLevel(dt)
             alarm = lvl[0]
@@ -357,7 +422,7 @@ def calculateAlarmLevel(wasteDate: datetime):
 
     level = 1
     smallerTxt = ""
-    if(wasteDate is not None):
+    if (wasteDate is not None):
         delta = wasteDate - datetime.now().date()
         # Level = (0=gray, 1=green, 2=yellow, 3=orange, 4=red)
         if delta.days <= 1:
@@ -378,55 +443,6 @@ def calculateAlarmLevel(wasteDate: datetime):
         else:
             smallerTxt = '{} ({} Tage)'.format(smallerTxt, delta.days)
     return [level, smallerTxt]
-
-
-def findDivByClass(soup: BeautifulSoup, name: str):
-    """just search 
-
-    Arguments:
-        soup {BeautifulSoup} -- the soup
-        name {str} -- classname attribute of the searched div element
-
-    Returns:
-        [soup element] -- the found element
-    """
-    d = soup.find("div", {"class": name})
-    if d is None:
-        d = soup.find_all("div", class_=name)
-    return d
-
-
-def findDivByName(soup: BeautifulSoup, name: str):
-    return soup.find("div", {"name": name})
-
-
-def getInputValue(soup: BeautifulSoup, id: str):
-    """search input field by Id and return value
-
-    Arguments:
-        soup {BeautifulSoup} -- the soup
-        id {str} -- id of searched element
-
-    Returns:
-        [type] -- value
-    """
-    inpt = soup.find('input', {'id': id})
-    return getValue(inpt)
-
-
-def getValue(inpt):
-    """reads in an input field and extracts the value of it
-
-    Args:
-        inpt ([type]): html input field
-
-    Returns:
-        str: value of that field
-    """
-    r: str = None
-    if inpt:
-        r = inpt.get('value')
-    return r
 
 
 def toDate(sDate: str, sformat: str = "%Y-%m-%d"):
