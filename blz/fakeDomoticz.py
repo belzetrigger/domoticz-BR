@@ -12,8 +12,15 @@ import logging
 log = logging.getLogger(__name__)
 log.level = logging.DEBUG
 
-Parameters: Dict[str, Any] = {"Mode1": None, "Mode2": None, "Mode3": None,
-                              "Mode4": None, "Mode5": None, "Mode6": "Debug"}
+Parameters: Dict[str, Any] = {"Mode1": None,
+                              "Mode2": None,
+                              "Mode3": None,
+                              "Mode4": None,
+                              "Mode5": None,
+                              "Mode6": "Debug",
+                              "HomeFolder": "./",
+                              "StartupFolder": "wwwtest/"
+                              }
 Images: Dict[str, Any] = {}
 Devices: Dict[str, Any] = {}
 
@@ -32,13 +39,13 @@ class X:
     nValue: int
     LastLevel: int
 
-    def __init__(self, aID: str) -> None:
+    def __init__(self, iUnit: int, aID: str) -> None:
         self.ID = aID
         self.Name = str(aID)
         self.Unit = aID
         self.DeviceID = aID
         self.sValue = str(aID)
-        self.nValue = -1
+        self.nValue = iUnit
         self.level = 0
         pass
 
@@ -46,15 +53,19 @@ class X:
         log.info("create called")
         pass
 
-    def Update(self, alarmLevel: int = 0, alarmData: str = None, Name: str = None, descr: str = None):
+    def Update(self, nValue: int = 0, sValue: str = None, Name: str = None, descr: str = None):
+        '''
+        nValue: alarmLevel
+        sValue: alarmData
+        '''
         self.LastLevel = self.level
-        self.level = alarmLevel
+        self.level = nValue
         self.Name = Name
         self.descr = descr
-        self.sValue = alarmData
+        self.sValue = sValue
         log.debug("update called:  alarmLevel: {}, "
                   "alarmData: {} , Name: {}, descr: {} "
-                  .format(alarmLevel, alarmData, Name, descr))
+                  .format(nValue, sValue, Name, descr))
         pass
 
 
@@ -71,7 +82,7 @@ def Device(Name: str, Unit: str, TypeName: str,
     log.debug("Device called: Name: {}, Unit: {}, TypeName: {}, "
               "Used: {}, Switchtype: {},Options: {}".format(
                   Name, Unit, TypeName, Used, Switchtype, Options))
-    x = X(Unit)
+    x = X(Unit, str(Unit))
     Devices[Unit] = x
     return x
 
