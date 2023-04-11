@@ -5,15 +5,24 @@ import codecs
 
 
 sys.path.insert(0, "..")
+from blz.blzHelperInterface import BlzHelperInterface
+from plugin import BasePlugin
+from blz.fakeDomoticz import Parameters
+from blz.fakeDomoticz import Devices
+
 from br.brHelper import Br
 import configparser
+
 
 CONFIG_SECTION_MY = "login_my"
 CONFIG_SECTION_STANDARD = "login_fail"
 
-# set up logger
-logger = logging.getLogger()
-logger.level = logging.DEBUG
+# set up log
+# init ROOT logger from my_logger.logger_init()
+from test.logger import logger_init
+from test.logger import logger_cleanUp
+logger_init()  # init root logger
+logger = logging.getLogger(__name__)  # module logger
 
 
 class Test_br(unittest.TestCase):
