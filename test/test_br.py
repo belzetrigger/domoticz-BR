@@ -1,7 +1,7 @@
-from blz.blzHelperInterface import BlzHelperInterface
-from plugin import BasePlugin
-from blz.fakeDomoticz import Parameters
-from blz.fakeDomoticz import Devices
+# from blz.blzHelperInterface import BlzHelperInterface
+# from plugin import BasePlugin
+# from blz.fakeDomoticz import Parameters
+# from blz.fakeDomoticz import Devices
 
 from br.brHelper import Br
 import configparser
