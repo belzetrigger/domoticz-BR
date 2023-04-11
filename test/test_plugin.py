@@ -3,9 +3,6 @@ import sys
 import logging
 import codecs
 
-from test.logger import LogColorerFormatter, OneLineExceptionFormatter
-
-
 sys.path.insert(0, "..")
 from blz.blzHelperInterface import BlzHelperInterface
 from plugin import BasePlugin
