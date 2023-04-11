@@ -1,30 +1,28 @@
+# from blz.blzHelperInterface import BlzHelperInterface
+from plugin import BasePlugin
+from blz.fakeDomoticz import Parameters
+# from blz.fakeDomoticz import Devices
+
+from br.brHelper import Br
+import configparser
+
+from test.logger import logger_init
+from test.logger import logger_cleanUp
+# other stuff
 import unittest
 import sys
 import logging
 import codecs
 
 sys.path.insert(0, "..")
-from blz.blzHelperInterface import BlzHelperInterface
-from plugin import BasePlugin
-from blz.fakeDomoticz import Parameters
-from blz.fakeDomoticz import Devices
-
-from br.brHelper import Br
-import configparser
 
 CONFIG_SECTION_MY = "login_my"
 CONFIG_SECTION_STANDARD = "login_fail"
 
 # set up log
 # init ROOT logger from my_logger.logger_init()
-from test.logger import logger_init
-from test.logger import logger_cleanUp
 logger_init()  # init root logger
 log = logging.getLogger(__name__)  # module logger
-
-import os
-# logging.basicConfig(level=os.environ.get("LOGLEVEL", "DEBUG"))
-# log.level = logging.DEBUG
 
 
 class Test_plugin(unittest.TestCase):
@@ -33,7 +31,8 @@ class Test_plugin(unittest.TestCase):
         self.plugin = BasePlugin()  # plugin()
 
         config = configparser.ConfigParser()
-        config.read_file(codecs.open(r"./test/my_config.ini", encoding="utf-8"))
+        config.read_file(codecs.open(r"./test/my_config.ini",
+                                     encoding="utf-8"))
         self.br = self.readAndCreate(config, CONFIG_SECTION_MY)
 
         self.plugin.br = self.br
